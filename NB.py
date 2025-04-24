@@ -9,25 +9,7 @@ def prob(x, mean, sd):
             return 1
         else:
             return 0
-def classify_nb(training_filename, testing_filename):
-    # Load the CSV file
-    training_data = []
-    training_class = []
-    testing_data = []
-    
-    with open(training_filename, newline='') as training:
-        reader = csv.reader(training)
-        for row in reader:
-            numeric_part = [float(x) for x in row[:-1]]
-            training_data.append(numeric_part)
-            training_class.append(row[-1])
-    
-    with open(testing_filename, newline='') as testing:
-        reader = csv.reader(testing)
-        for row in reader:
-            numeric_part = [float(x) for x in row]
-            testing_data.append(numeric_part)
-
+def classify_nb(training_data, training_class, testing_data, testing_class):
     attributeN = len(training_data[0])
 
     mean = []
@@ -45,9 +27,10 @@ def classify_nb(training_filename, testing_filename):
         mean.append([np.mean(columnYes), np.mean(columnNo)])
         sd.append([np.std(columnYes), np.std(columnNo)])
 
-    res = []
-    cnt = 0
-    for row in testing_data:
+    correct = 0
+    total = len(testing_data)
+    for j in range(len(testing_data)):
+        row = testing_data[j]
         yesProb = 1
         noProb = 1
         for i in range(attributeN):
@@ -65,12 +48,60 @@ def classify_nb(training_filename, testing_filename):
         noProb = noProb * (no/(yes + no))
 
         if(yesProb > noProb):
-            res.append("yes")
+            if(testing_class[j] == "yes"):
+                correct += 1
         else:
-            res.append("no")
-    return res
-        
+            if(testing_class[j] == "no"):
+                correct += 1
+    return (correct/total)
 
-    
-    
-    
+def ten_fold_validation(filename):
+    data_by_fold = []
+    current_fold_data = []
+    class_by_fold = []
+    current_fold_class = []
+
+    with open(filename) as file:
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("fold"):
+                if current_fold_data:
+                    data_by_fold.append(current_fold_data)
+                    class_by_fold.append(current_fold_class)
+                    current_fold_data = []
+                    current_fold_class = []
+            else:
+                parts = line.split(",")
+                feature = list(map(float, parts[:-1]))
+                current_fold_data.append(feature)
+                current_fold_class.append(parts[-1])
+
+        # Add the last fold's data
+        if current_fold_data:
+            data_by_fold.append(current_fold_data)
+            class_by_fold.append(current_fold_class)
+
+
+        res = 0
+        for i in range(len(data_by_fold)):
+            training_data = []
+            training_class = []
+            testing_data = []
+            testing_class = []
+            for j in range(len(data_by_fold)):
+                if(i == j):
+                    testing_class = testing_class + class_by_fold[j]
+                    testing_data = testing_data + data_by_fold[j]
+
+                else:
+                    training_class = training_class + class_by_fold[j]
+                    training_data = training_data + data_by_fold[j]
+
+            res += classify_nb(training_data, training_class, testing_data, testing_class)
+    return res/10
+
+if __name__ == '__main__':
+    print(ten_fold_validation("pima-folds-numeric.csv"))
+        
